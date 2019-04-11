@@ -120,6 +120,7 @@ void displayPrinterStatus();
 // TODO: doriesit tlacidla, single press, multi press, long press...
 // TODO: pri starte dat servo do stredovej polohy 
 
+
 void flashLED(int number, int delayTime) {
   for (int inx = 0; inx < number; inx++) {
       delay(delayTime);
