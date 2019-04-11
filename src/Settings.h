@@ -74,14 +74,14 @@ const char* on_cmd = "ON";
 const char* off_cmd = "OFF";
 const char* will_msg = "Offline";
 const char* online_msg = "Online";
-int sendInterval = 3;
+int sendInterval = 5;
 String LWTTopic ;
 String SUBTopic ;
 String PUBTopicLight ;
 String PUBTopicAngle ;
 
 // Date and Time
-float UtcOffset = +1; // Hour offset from GMT for your timezone
+float UtcOffset = +2; // Hour offset from GMT for your timezone
 boolean IS_REVERSED_CONTROL = false;    
 boolean IS_24HOUR = true;     // 23:00 millitary 24 hour clock
 int minutesBetweenDataRefresh = 15;

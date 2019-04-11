@@ -80,6 +80,7 @@ String CHANGE_FORM =  "<form class='w3-container' action='/updateconfig' method=
                       
 String THEME_FORM =   "<p>Theme Color <select class='w3-option w3-padding' name='theme'>%THEME_OPTIONS%</select></p>"
                       "<p><input name='is24hour' class='w3-check w3-margin-top' type='checkbox' %IS_24HOUR_CHECKED%> Use 24 Hour Clock (military time)</p>"
+                      "<p>Clock Sync (minutes) <select class='w3-option w3-padding' name='refresh'>%OPTIONS%</select></p>"
                       "<p><label>UTC Time Offset</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='utcoffset' value='%UTCOFFSET%' maxlength='12'></p><hr>"
                       "<p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
                       "<p><label>User ID (for this interface)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='userid' value='%USERID%' maxlength='20'></p>"
@@ -115,10 +116,11 @@ void handleWifiReset();
 void handleUpdateConfig();
 void handleConfigure();
 void handleRestart();
-void displayPrinterStatus();
+void displayDeviceStatus();
 
-// TODO: doriesit tlacidla, single press, multi press, long press...
+// TODO: doriesit tlacidla, single press, multi press, long press... https://www.instructables.com/id/Arduino-Dual-Function-Button-Long-PressShort-Press/
 // TODO: pri starte dat servo do stredovej polohy 
+// TODO: dorobit auto natocenie podla najlepsieho svetla
 
 
 void flashLED(int number, int delayTime) {
@@ -307,16 +309,16 @@ String getHeader(boolean refresh=false) {
   html += "<meta charset='UTF-8'>";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
   if (refresh) {
-    html += "<meta http-equiv=\"refresh\" content=\"30\">";
+    html += "<meta http-equiv=\"refresh\" content=\"15\">";
   }
   html += "<link rel='stylesheet' href='https://www.w3schools.com/w3css/4/w3.css'>";
   html += "<link rel='stylesheet' href='https://www.w3schools.com/lib/w3-theme-" + themeColor + ".css'>";
-  html += "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css'>";
+  html += "<link rel='stylesheet' href='https://use.fontawesome.com/releases/v5.8.1/css/all.css' integrity='sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf' crossorigin='anonymous'>";
   html += "</head><body>";
   html += "<nav class='w3-sidebar w3-bar-block w3-card' style='margin-top:88px' id='mySidebar'>";
   html += "<div class='w3-container w3-theme-d2'>";
   html += "<span onclick='closeSidebar()' class='w3-button w3-display-topright w3-large'><i class='fa fa-times'></i></span>";
-  html += "<div class='w3-cell w3-left w3-xxxlarge' style='width:60px'><i class='fa fa-align-justify'></i></div>";
+  html += "<div class='w3-cell w3-left w3-xxxlarge' style='width:60px'><i class='fa fa-cloud-sun'></i></div>";
   html += "<div class='w3-padding'>Menu</div></div>";
   html += menu;
   html += "</nav>";
@@ -339,7 +341,7 @@ String getFooter() {
   if (lightPercent >= 0) {
     html += "<i class='fa fa-sun'></i> Light intensity: " + String(lightPercent) + "%<br>";
   }
-  html += "<i class='fa fa-paper-plane-o'></i> Version: " + String(VERSION) + "<br>";
+  html += "<i class='fa fa-code-branch'></i> Version: " + String(VERSION) + "<br>";
   html += "<i class='fa fa-rss'></i> Signal Strength: ";
   html += String(rssi) + "%";
   html += "</footer>";
@@ -380,10 +382,30 @@ void handleWifiReset() {
   ESP.restart();
 }
 
+void displayMessage(String message) {
+  digitalWrite(externalLight, LOW);
+
+  server.sendHeader("Cache-Control", "no-cache, no-store");
+  server.sendHeader("Pragma", "no-cache");
+  server.sendHeader("Expires", "-1");
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/html", "");
+  String html = getHeader();
+  server.sendContent(String(html));
+  server.sendContent(String(message));
+  html = getFooter();
+  server.sendContent(String(html));
+  server.sendContent("");
+  server.client().stop();
+  
+  digitalWrite(externalLight, HIGH);
+}
+
 void handleRestart() {
   if (!authentication()) {
     return server.requestAuthentication();
   }
+  displayMessage("Restarting the device...");
   ESP.restart();
 }
 
@@ -420,21 +442,13 @@ void handleConfigure() {
     isClockChecked = "checked='checked'";
   }
   form.replace("%IS_CLOCK_CHECKED%", isClockChecked);
-  String is24hourChecked = "";
-  if (IS_24HOUR) {
-    is24hourChecked = "checked='checked'";
-  }
-  form.replace("%IS_24HOUR_CHECKED%", is24hourChecked);
-  
+
   String isreversedControlChecked = "";
   if (IS_REVERSED_CONTROL) {
     isreversedControlChecked = "checked='checked'";
   }
   form.replace("%IS_REVERSED_CONTROL%", isreversedControlChecked);
   
-  String options = "<option>10</option><option>15</option><option>20</option><option>30</option><option>60</option>";
-  options.replace(">"+String(minutesBetweenDataRefresh)+"<", " selected>"+String(minutesBetweenDataRefresh)+"<");
-  form.replace("%OPTIONS%", options);
 
   server.sendContent(form);
 
@@ -451,6 +465,16 @@ void handleConfigure() {
   form.replace("%IS_BASICAUTH_CHECKED%", isUseSecurityChecked);
   form.replace("%USERID%", String(www_username));
   form.replace("%STATIONPASSWORD%", String(www_password));
+  
+  String is24hourChecked = "";
+  if (IS_24HOUR) {
+    is24hourChecked = "checked='checked'";
+  }
+  form.replace("%IS_24HOUR_CHECKED%", is24hourChecked);
+  
+  String options = "<option>10</option><option>15</option><option>20</option><option>30</option><option>60</option>";
+  options.replace(">"+String(minutesBetweenDataRefresh)+"<", " selected>"+String(minutesBetweenDataRefresh)+"<");
+  form.replace("%OPTIONS%", options);
 
   server.sendContent(form);
   
@@ -514,12 +538,17 @@ void measureLight() {
 
     float lightReading = analogRead(LDRPIN) ;
     
-    lightPercent = ( int(lightReading) / MAXLIGHT ) * 100;
+    lightPercent = ( lightReading / MAXLIGHT ) * 100;
     Serial.print("Light percent: ");
     Serial.println(lightPercent);
     Serial.print("Light analog reading : ");
-    Serial.println(lightReading);
-    char *LIGHTchar = &String(lightPercent)[0u];
+    Serial.print(lightReading);
+    Serial.println(" %");
+    if (lightPercent > 100) {
+      lightPercent = 100;
+    }    
+    String LIGHTstr = String(lightPercent);
+    char *LIGHTchar = &LIGHTstr[0u];
     client.publish((const char*)PUBTopicLight.c_str(), LIGHTchar, false);
   }
 }
@@ -597,7 +626,7 @@ void setup() {
   }
 
   if (WEBSERVER_ENABLED) {
-    server.on("/", displayPrinterStatus);
+    server.on("/", displayDeviceStatus);
     server.on("/systemreset", handleSystemReset);
     server.on("/forgetwifi", handleWifiReset);
     server.on("/updateconfig", handleUpdateConfig);
@@ -659,12 +688,36 @@ void reconnectMQTT() {
     }
 }
 
+int getMinutesFromLastRefresh() {
+  int minutes = (timeClient.getCurrentEpoch() - lastEpoch) / 60;
+  return minutes;
+}
+
+
+void getUpdateTime() {
+  digitalWrite(externalLight, LOW); // turn on the LED
+  Serial.println();
+
+  Serial.println("Updating Time...");
+  //Update the Time
+  timeClient.updateTime();
+  lastEpoch = timeClient.getCurrentEpoch();
+  Serial.println("Local time: " + timeClient.getAmPmFormattedTime());
+
+  digitalWrite(externalLight, HIGH);  // turn off the LED
+}
+
 //************************************************************
 // Main Looop
 //************************************************************
 void loop() {
 
   now = millis();
+   
+  //Get Time Update
+  if((getMinutesFromLastRefresh() >= minutesBetweenDataRefresh) || lastEpoch == 0) {
+    getUpdateTime();
+  }
 
   if (WEBSERVER_ENABLED) {
     server.handleClient();
@@ -683,19 +736,6 @@ void loop() {
 
   // Measure the light intensity
   measureLight();
-}
-
-void getUpdateTime() {
-  digitalWrite(externalLight, LOW); // turn on the LED
-  Serial.println();
-
-  Serial.println("Updating Time...");
-  //Update the Time
-  timeClient.updateTime();
-  lastEpoch = timeClient.getCurrentEpoch();
-  Serial.println("Local time: " + timeClient.getAmPmFormattedTime());
-
-  digitalWrite(externalLight, HIGH);  // turn off the LED
 }
 
 void handleUpdateConfig() {
@@ -730,26 +770,7 @@ void handleUpdateConfig() {
   reconnectMQTT();
 }
 
-void displayMessage(String message) {
-  digitalWrite(externalLight, LOW);
-
-  server.sendHeader("Cache-Control", "no-cache, no-store");
-  server.sendHeader("Pragma", "no-cache");
-  server.sendHeader("Expires", "-1");
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.send(200, "text/html", "");
-  String html = getHeader();
-  server.sendContent(String(html));
-  server.sendContent(String(message));
-  html = getFooter();
-  server.sendContent(String(html));
-  server.sendContent("");
-  server.client().stop();
-  
-  digitalWrite(externalLight, HIGH);
-}
-
-void displayPrinterStatus() {
+void displayDeviceStatus() {
   digitalWrite(externalLight, LOW);
   String html = "";
 
@@ -767,8 +788,11 @@ void displayPrinterStatus() {
   
   html += "<div class='w3-cell-row' style='width:100%'><h2>Time: " + displayTime + "</h2></div><div class='w3-cell-row'>";
   html += "<div class='w3-cell w3-container' style='width:100%'><p>";
-  html += "Host Name: <br>";
-  
+  html += "Host Name: " + hostname + "<br>";
+  // TODO: dorobit fancy home page info o gerete
+  // TODO: dorobit controll servra z webu 
+
+
   html += "</p></div></div>";
 
   server.sendContent(html); // spit out what we got
@@ -801,14 +825,4 @@ int8_t getWifiQuality() {
   } else {
       return 2 * (dbm + 100);
   }
-}
-
-int getMinutesFromLastRefresh() {
-  int minutes = (timeClient.getCurrentEpoch() - lastEpoch) / 60;
-  return minutes;
-}
-
-int getMinutesFromLastDisplay() {
-  int minutes = (timeClient.getCurrentEpoch() - displayOffEpoch) / 60;
-  return minutes;
 }
