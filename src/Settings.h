@@ -52,6 +52,11 @@ int servoPIN = D4;
 int servoEnablePIN = D3;
 int LDRPIN = A0;
 Servo blinds;
+int MINANGLE = 0;
+int MAXANGLE = 180;
+int MAXLIGHT = 1023;
+int lightPercent = -1;
+int actualServoAngle = 90;
 
 // Webserver
 const int WEBSERVER_PORT = 80; // The port you can access this device on over HTTP

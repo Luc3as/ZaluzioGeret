@@ -63,6 +63,7 @@ String WEB_ACTIONS =  "<a class='w3-bar-item w3-button' href='/'><i class='fa fa
                       "<a class='w3-bar-item w3-button' href='/systemreset' onclick='return confirm(\"Do you want to reset to default settings?\")'><i class='fa fa-undo'></i> Reset Settings</a>"
                       "<a class='w3-bar-item w3-button' href='/forgetwifi' onclick='return confirm(\"Do you want to forget to WiFi connection?\")'><i class='fa fa-wifi'></i> Forget WiFi</a>"
                       "<a class='w3-bar-item w3-button' href='/update'><i class='fa fa-wrench'></i> Firmware Update</a>"
+                      "<a class='w3-bar-item w3-button' href='/restart' onclick='return confirm(\"Do you want to restart device? Settings will persist.\")'><i class='fa fa-power-off'></i> Restart device</a>"
                       "<a class='w3-bar-item w3-button' href='https://github.com/Luc3as' target='_blank'><i class='fa fa-question-circle'></i> About</a>";
                             
 String CHANGE_FORM =  "<form class='w3-container' action='/updateconfig' method='get'><h2>Device Config:</h2>"
@@ -73,9 +74,12 @@ String CHANGE_FORM =  "<form class='w3-container' action='/updateconfig' method=
                       "<p><label>MQTT subscribe topic prefix ( prefix/hostname/topic )</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttSubTopic' value='%MQTTSUBTOPIC%' maxlength='30'></p>"
                       "<p><label>MQTT publish topic prefix ( prefix/hostname/topic )</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttPubTopic' value='%MQTTPUBTOPIC%' maxlength='30'></p><hr>"
                       "<p><input name='isreversedcontrol' class='w3-check w3-margin-top' type='checkbox' %IS_REVERSED_CONTROL%> Reverse direction of servo</p><hr>"
-                      "<p><input name='is24hour' class='w3-check w3-margin-top' type='checkbox' %IS_24HOUR_CHECKED%> Use 24 Hour Clock (military time)</p>";
+                      "<p><label>Minimal servo angle</label><input class='w3-input w3-border w3-margin-bottom' type='number' name='minAngle' value='%MINANGLE%' min'0' max'180'></p>"
+                      "<p><label>Maximal servo angle</label><input class='w3-input w3-border w3-margin-bottom' type='number' name='maxAngle' value='%MAXANGLE%' min'0' max'180'></p>"
+                      "<p><label>Maximal light intensity ( 0 - 1023 )</label><input class='w3-input w3-border w3-margin-bottom' type='number' name='maxLight' value='%MAXLIGHT%' min'0' max'1023'></p>";
                       
 String THEME_FORM =   "<p>Theme Color <select class='w3-option w3-padding' name='theme'>%THEME_OPTIONS%</select></p>"
+                      "<p><input name='is24hour' class='w3-check w3-margin-top' type='checkbox' %IS_24HOUR_CHECKED%> Use 24 Hour Clock (military time)</p>"
                       "<p><label>UTC Time Offset</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='utcoffset' value='%UTCOFFSET%' maxlength='12'></p><hr>"
                       "<p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
                       "<p><label>User ID (for this interface)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='userid' value='%USERID%' maxlength='20'></p>"
@@ -110,6 +114,9 @@ void writeSettings();
 void handleWifiReset();
 void handleUpdateConfig();
 void handleConfigure();
+void handleRestart();
+void displayPrinterStatus();
+
 
 void flashLED(int number, int delayTime) {
   for (int inx = 0; inx < number; inx++) {
@@ -201,7 +208,19 @@ void readSettings() {
       MQTTPUBTOPIC = line.substring(line.lastIndexOf("MQTTPUBTOPIC=") + 13);
       MQTTPUBTOPIC.trim();
       Serial.println("MQTTPUBTOPIC=" + String(MQTTPUBTOPIC));
-    }     
+    }
+    if (line.indexOf("MINANGLE=") >= 0) {
+      MINANGLE = line.substring(line.lastIndexOf("MINANGLE=") + 9).toInt();
+      Serial.println("MINANGLE=" + String(MINANGLE));
+    }
+    if (line.indexOf("MAXANGLE=") >= 0) {
+      MAXANGLE = line.substring(line.lastIndexOf("MAXANGLE=") + 9).toInt();
+      Serial.println("MAXANGLE=" + String(MAXANGLE));
+    }      
+    if (line.indexOf("MAXLIGHT=") >= 0) {
+      MAXLIGHT = line.substring(line.lastIndexOf("MAXLIGHT=") + 9).toInt();
+      Serial.println("MAXLIGHT=" + String(MAXLIGHT));
+    }         
   }
   fr.close();
   timeClient.setUtcOffset(UtcOffset);
@@ -234,6 +253,9 @@ void writeSettings() {
     f.println("MQTTPASS=" + String(MQTTPASS));
     f.println("MQTTSUBTOPIC=" + String(MQTTSUBTOPIC));
     f.println("MQTTPUBTOPIC=" + String(MQTTPUBTOPIC));
+    f.println("MINANGLE=" + String(MINANGLE));
+    f.println("MAXANGLE=" + String(MAXANGLE));
+    f.println("MAXLIGHT=" + String(MAXLIGHT));
   }
   f.close();
   readSettings();
@@ -303,7 +325,7 @@ String getHeader(boolean refresh=false) {
   return html;
 }
 
-String getFooter() {
+String getFooter() { 
   int8_t rssi = getWifiQuality();
   Serial.print("Signal Strength (RSSI): ");
   Serial.print(rssi);
@@ -311,8 +333,8 @@ String getFooter() {
   String html = "<br><br><br>";
   html += "</div>";
   html += "<footer class='w3-container w3-bottom w3-theme w3-margin-top'>";
-  if (lastReportStatus != "") {
-    html += "<i class='fa fa-external-link'></i> Report Status: " + lastReportStatus + "<br>";
+  if (lightPercent >= 0) {
+    html += "<i class='fa fa-sun'></i> Light intensity: " + String(lightPercent) + "%<br>";
   }
   html += "<i class='fa fa-paper-plane-o'></i> Version: " + String(VERSION) + "<br>";
   html += "<i class='fa fa-rss'></i> Signal Strength: ";
@@ -355,6 +377,13 @@ void handleWifiReset() {
   ESP.restart();
 }
 
+void handleRestart() {
+  if (!authentication()) {
+    return server.requestAuthentication();
+  }
+  ESP.restart();
+}
+
 void handleConfigure() {
   if (!authentication()) {
     return server.requestAuthentication();
@@ -379,6 +408,9 @@ void handleConfigure() {
   form.replace("%MQTTPASS%", MQTTPASS);
   form.replace("%MQTTSUBTOPIC%", MQTTSUBTOPIC);
   form.replace("%MQTTPUBTOPIC%", MQTTPUBTOPIC);
+  form.replace("%MINANGLE%", String(MINANGLE));
+  form.replace("%MAXANGLE%", String(MAXANGLE));
+  form.replace("%MAXLIGHT%", String(MAXLIGHT));
 
   String isClockChecked = "";
   if (DISPLAYCLOCK) {
@@ -427,6 +459,21 @@ void handleConfigure() {
 }
 
 void controlServo(int angle) {
+  // check min angle
+  if (angle < MINANGLE) {
+    angle = MINANGLE;
+  }
+  // check max angle
+  if (angle > MAXANGLE) {
+    angle = MAXANGLE;
+  }
+  // calculate reversed direction angle if needed  
+  if (IS_REVERSED_CONTROL ) {
+    angle = ( 180 - angle ) ;
+  }
+
+  actualServoAngle = angle ; 
+
   // Enable servo
   digitalWrite(servoEnablePIN, HIGH);
   delay(10);
@@ -440,36 +487,36 @@ void handleIncommingMessage(char* topic, byte* payload, unsigned int length) {
     Serial.print("Message arrived [");
     Serial.print(topic);
     Serial.print("] ");
-    if (!strcmp(topic, (const char*)SUBTopic.c_str())) {
+    if (!strcmp(topic, (const char*)SUBTopic.c_str())) {  // new servo position arrived
         char angle[3];
         for (int i = 0; i < length; i++) {
             Serial.print((char)payload[i]);
             angle[i] = (char)payload[i];
         }
         Serial.println();
-        if (atoi(angle) > 0 && atoi(angle) <= 180 ) {
+        if (atoi(angle) > MINANGLE && atoi(angle) <= MAXANGLE ) {
             Serial.print("Moving blind to angle: ");
             Serial.println(atoi(angle));
             controlServo(atoi(angle));
             client.publish((const char*)PUBTopicAngle.c_str(),String(atoi(angle)).c_str(), false);
         } else {
-            Serial.println("Angle should be between 1 and 180 degrees.");
+            Serial.println("Angle should be between " + String(MINANGLE) + " and " + String(MAXANGLE) + " degrees.");
         }
-
     } 
 }
 
-void measureLight() {
+void measureLight() { 
   if( now - lastSend > (sendInterval * 1000)) {
     lastSend = millis();
 
-    float lightReading = analogRead(LDRPIN) * (3.3 / 1023.0);
-    String lightIntensity = String(lightReading);
-    Serial.print("Light intensity: ");
-    Serial.println(lightIntensity);
+    float lightReading = analogRead(LDRPIN) ;
+    
+    lightPercent = ( int(lightReading) / MAXLIGHT ) * 100;
+    Serial.print("Light percent: ");
+    Serial.println(lightPercent);
     Serial.print("Light analog reading : ");
-    Serial.println(analogRead(A0));
-    char *LIGHTchar = &lightIntensity[0u];
+    Serial.println(lightReading);
+    char *LIGHTchar = &String(lightPercent)[0u];
     client.publish((const char*)PUBTopicLight.c_str(), LIGHTchar, false);
   }
 }
@@ -547,11 +594,12 @@ void setup() {
   }
 
   if (WEBSERVER_ENABLED) {
-    server.on("/", handleConfigure);
+    server.on("/", displayPrinterStatus);
     server.on("/systemreset", handleSystemReset);
     server.on("/forgetwifi", handleWifiReset);
     server.on("/updateconfig", handleUpdateConfig);
     server.on("/configure", handleConfigure);
+    server.on("/restart", handleRestart);
     server.onNotFound(redirectHome);
     serverUpdater.setup(&server, "/update", www_username, www_password);
     // Start the server
@@ -668,6 +716,9 @@ void handleUpdateConfig() {
   temp.toCharArray(www_username, sizeof(temp));
   temp = server.arg("stationpassword");
   temp.toCharArray(www_password, sizeof(temp));
+  MINANGLE = server.arg("minAngle").toInt();
+  MAXANGLE = server.arg("maxAngle").toInt();
+  MAXLIGHT = server.arg("maxLight").toInt();
 
   writeSettings();
   findMDNS();
