@@ -65,7 +65,7 @@ String WEB_ACTIONS =  "<a class='w3-bar-item w3-button' href='/'><i class='fa fa
                       "<a class='w3-bar-item w3-button' href='/update'><i class='fa fa-wrench'></i> Firmware Update</a>"
                       "<a class='w3-bar-item w3-button' href='/restart' onclick='return confirm(\"Do you want to restart device? Settings will persist.\")'><i class='fa fa-power-off'></i> Restart device</a>"
                       "<a class='w3-bar-item w3-button' href='https://github.com/Luc3as' target='_blank'><i class='fa fa-question-circle'></i> About</a>";
-                            
+                          
 String CHANGE_FORM =  "<form class='w3-container' action='/updateconfig' method='get'><h2>Device Config:</h2>"
                       "<p><label>MQTT Server address</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttAddress' value='%MQTTADDRESS%' maxlength='60'></p>"
                       "<p><label>MQTT Server Port</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttPort' value='%MQTTPORT%' maxlength='5'  onkeypress='return isNumberKey(event)'></p>"
@@ -326,6 +326,7 @@ String getHeader(boolean refresh=false) {
   html += "</script>";
   html += "<br><div class='w3-container w3-large' style='margin-top:88px'>";
   return html;
+  // TODO: dorobit ajax script pre ovladanie serva https://circuits4you.com/2018/02/04/esp8266-ajax-update-part-of-web-page-without-refreshing/
 }
 
 String getFooter() { 
@@ -822,6 +823,20 @@ void handleUpdateConfig() {
   reconnectMQTT();
 }
 
+String getUptime() {
+  unsigned long nowMillis = millis();
+  unsigned long seconds = nowMillis / 1000;
+  int days = seconds / 86400;
+  seconds %= 86400;
+  byte hours = seconds / 3600;
+  seconds %= 3600;
+  byte minutes = seconds / 60;
+  seconds %= 60;
+  String timeFormated ;
+  timeFormated = String(days) + " days, " + String(hours) + " hours, " + String(minutes) + " minutes, " + String(seconds) + " seconds";
+  return(timeFormated);
+}
+
 void displayDeviceStatus() {
   digitalWrite(externalLight, LOW);
   String html = "";
@@ -841,9 +856,11 @@ void displayDeviceStatus() {
   html += "<div class='w3-cell-row' style='width:100%'><h2>Time: " + displayTime + "</h2></div><div class='w3-cell-row'>";
   html += "<div class='w3-cell w3-container' style='width:100%'><p>";
   html += "Host Name: " + hostname + "<br>";
-  // TODO: dorobit fancy home page info o gerete
-  // TODO: dorobit controll servra z webu 
+  html += "Uptime: " + getUptime() + "<br>";  
+  html += "<hr> <h2>Blinds position: </h2> <br>";
+  html += "<input type='range' style='min-width: 50%;' min='" + String(MINANGLE) + "' max='" + String(MAXANGLE) + "' value='" + String(actualServoAngle) + "' class='slider' id='angleSlider'>";
 
+  // TODO: dorobit fancy home page info o gerete
 
   html += "</p></div></div>";
 
