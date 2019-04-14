@@ -57,6 +57,14 @@ int MAXANGLE = 180;
 int MAXLIGHT = 1023;
 int lightPercent = -1;
 int actualServoAngle = 90;
+int buttonUp = D5;
+int buttonDown = D6;
+long buttonTimer = 0;   // For counting time the button is presed
+long longPressTime = 1000;  // How long is considered as long-press of button (miliseconds)
+boolean buttonActive = false;
+boolean longPressActive = false;
+boolean buttonUpActive = false;
+boolean buttonDownActive = false;
 
 // Webserver
 const int WEBSERVER_PORT = 80; // The port you can access this device on over HTTP

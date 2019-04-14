@@ -118,8 +118,6 @@ void handleConfigure();
 void handleRestart();
 void displayDeviceStatus();
 
-// TODO: doriesit tlacidla, single press, multi press, long press... https://www.instructables.com/id/Arduino-Dual-Function-Button-Long-PressShort-Press/
-// TODO: pri starte dat servo do stredovej polohy 
 // TODO: dorobit auto natocenie podla najlepsieho svetla
 
 
@@ -486,6 +484,7 @@ void handleConfigure() {
 }
 
 void controlServo(int angle) {
+  int angleOfMove = abs(angle - actualServoAngle) ; 
   // check min angle
   if (angle < MINANGLE) {
     angle = MINANGLE;
@@ -505,9 +504,15 @@ void controlServo(int angle) {
   digitalWrite(servoEnablePIN, HIGH);
   delay(10);
   blinds.write(angle);
-  delay((180 * 5 )+ 100);
+  // Wait for servo to actually move
+  delay(( angleOfMove * 5 )+ 100);
   // Disable servo
   digitalWrite(servoEnablePIN, LOW);
+
+  // Send acknowledge of servo move
+  String actualServoAngleStr = String(actualServoAngle);
+  char *actualServoAngleChar = &actualServoAngleStr[0u];
+  client.publish((const char*)PUBTopicAngle.c_str(),actualServoAngleChar, false);
 }
 
 void handleIncommingMessage(char* topic, byte* payload, unsigned int length) {
@@ -525,7 +530,6 @@ void handleIncommingMessage(char* topic, byte* payload, unsigned int length) {
             Serial.print("Moving blind to angle: ");
             Serial.println(atoi(angle));
             controlServo(atoi(angle));
-            client.publish((const char*)PUBTopicAngle.c_str(),String(atoi(angle)).c_str(), false);
         } else {
             Serial.println("Angle should be between " + String(MINANGLE) + " and " + String(MAXANGLE) + " degrees.");
         }
@@ -553,6 +557,49 @@ void measureLight() {
   }
 }
 
+void handleButtons() {
+	if (digitalRead(buttonUp) == HIGH) {  // start count time of short press of button UP
+		if (buttonActive == false) {
+			buttonActive = true;
+			buttonTimer = millis();
+		}
+    	buttonUpActive = true;
+	}
+	if (digitalRead(buttonDown) == HIGH) { // start count time of short press of button DOWN
+		if (buttonActive == false) {
+			buttonActive = true;
+			buttonTimer = millis();
+		}
+		buttonDownActive = true;
+	}
+	if ((buttonActive == true) && (millis() - buttonTimer > longPressTime) && (longPressActive == false)) {
+		longPressActive = true;
+		if ((buttonUpActive == true) && (buttonDownActive == true)) { //  Long press of both buttons
+      // Auto rotate by best light
+		} else if((buttonUpActive == true) && (buttonDownActive == false)) {  //  Long press of button UP
+      controlServo(MAXANGLE);
+		} else {                                                              // Long press of button DOWN
+      controlServo(MINANGLE);
+		}
+	}
+	if ((buttonActive == true) && (digitalRead(buttonUp) == LOW) && (digitalRead(buttonDown) == LOW)) {
+		if (longPressActive == true) {  // END of both long pressed buttons
+			longPressActive = false;
+		} else {
+			if ((buttonUpActive == true) && (buttonDownActive == true)) { // short press of both buttons
+        controlServo(90);
+			} else if ((buttonUpActive == true) && (buttonDownActive == false)) { // short press of button UP
+        controlServo(actualServoAngle + 5);
+			} else {                                                            // short press of button DOWN
+        controlServo(actualServoAngle - 5);
+			}
+		}
+		buttonActive = false;
+		buttonUpActive = false;
+		buttonDownActive = false;
+	}
+}
+
 //************************************************************
 // SETUP
 //************************************************************
@@ -568,6 +615,8 @@ void setup() {
 
   // Set PIN modes
   pinMode(servoEnablePIN, OUTPUT);
+  pinMode(buttonUp, INPUT);
+	pinMode(buttonDown, INPUT);
 
   // Initialize digital pin for LED (little blue light on the Wemos D1 Mini)
   pinMode(externalLight, OUTPUT);
@@ -655,6 +704,9 @@ void setup() {
 
   // Initial servo control off
   digitalWrite(servoEnablePIN, LOW);
+
+  // Reset servo position to middle
+  controlServo(actualServoAngle);
 
   Serial.println("*** Leaving setup()");
 }
