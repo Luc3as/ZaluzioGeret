@@ -118,6 +118,7 @@ void handleUpdateConfig();
 void handleConfigure();
 void handleRestart();
 void displayDeviceStatus();
+void lightFinder();
 
 // TODO: dorobit auto natocenie podla najlepsieho svetla
 
@@ -230,6 +231,7 @@ void readSettings() {
   timeClient.setUtcOffset(UtcOffset);
   LWTTopic = MQTTPUBTOPIC + "/" + hostname + "/LWT";
   SUBTopic = MQTTSUBTOPIC + "/" + hostname + "/Rotate";
+  SUBTopicLight = MQTTSUBTOPIC + "/" + hostname + "/FindLight";
   PUBTopicLight = MQTTPUBTOPIC + "/" + hostname + "/Light";
   PUBTopicAngle = MQTTPUBTOPIC + "/" + hostname + "/Angle";
 
@@ -506,7 +508,7 @@ void controlServo(int angle) {
   delay(10);
   blinds.write(angle);
   // Wait for servo to actually move
-  delay(( angleOfMove * 5 )+ 500);
+  delay(( angleOfMove * 10 )+ 200);
   // Disable servo
   digitalWrite(servoEnablePIN, LOW);
 
@@ -514,6 +516,38 @@ void controlServo(int angle) {
   String actualServoAngleStr = String(actualServoAngle);
   char *actualServoAngleChar = &actualServoAngleStr[0u];
   client.publish((const char*)PUBTopicAngle.c_str(),actualServoAngleChar, false);
+}
+
+void lightFinder(){
+  int bestLight = 0;
+  int bestAngle = 90;
+  float currentLight = 0;
+  float currentAngle ;
+  int a = MINANGLE;
+  Serial.println("Finding best light... ");
+  while( a < MAXANGLE ) {  
+    // Move servo
+    controlServo(a);
+    // Measure light
+    currentLight = analogRead(LDRPIN) ;
+    currentAngle = a;
+    if (currentLight > bestLight) { // If we have better light, mark angle
+      bestLight = currentLight;
+      bestAngle = a;
+    }
+    Serial.print("Angle: ");
+    Serial.print(a);
+    Serial.print(" Light: ");
+    Serial.println(currentLight);
+    a = a + 10 ;
+  }
+  Serial.print("Best light: ");
+  Serial.print(currentLight);
+  Serial.print(" at Angle: ");
+  Serial.println(a);  
+  
+  // Move blinds to best angle for light
+  controlServo(bestAngle);
 }
 
 void handleIncommingMessage(char* topic, byte* payload, unsigned int length) {
@@ -534,6 +568,16 @@ void handleIncommingMessage(char* topic, byte* payload, unsigned int length) {
         } else {
             Serial.println("Angle should be between " + String(MINANGLE) + " and " + String(MAXANGLE) + " degrees.");
         }
+    } 
+    if (!strcmp(topic, (const char*)SUBTopicLight.c_str())) {  // We  got command to find best light
+        char command[3];
+        for (int i = 0; i < length; i++) {
+            Serial.print((char)payload[i]);
+            command[i] = (char)payload[i];
+        }
+        Serial.println();
+        Serial.println("Got command for find light");
+        lightFinder();
     } 
 }
 
@@ -576,6 +620,7 @@ void handleButtons() {
 		longPressActive = true;
 		if ((buttonUpActive == true) && (buttonDownActive == true)) { //  Long press of both buttons
       // Auto rotate by best light
+      lightFinder();
       Serial.println("Long press both buttons");
 		} else if((buttonUpActive == true) && (buttonDownActive == false)) {  //  Long press of button UP
       controlServo(MAXANGLE);
@@ -731,6 +776,7 @@ void reconnectMQTT() {
           Serial.println("connected to MQTT");
           client.publish((const char*)LWTTopic.c_str(), online_msg, 1); // Send last will message
           client.subscribe((const char*)SUBTopic.c_str());
+          client.subscribe((const char*)SUBTopicLight.c_str());
         } else {
           Serial.print("failed, rc=");
           Serial.print(client.state());
