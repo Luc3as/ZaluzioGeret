@@ -113,6 +113,7 @@ String COLOR_THEMES = "<option>red</option>"
 
 void writeSettings();
 void handleWifiReset();
+void handleServoControl();
 void handleUpdateConfig();
 void handleConfigure();
 void handleRestart();
@@ -326,7 +327,6 @@ String getHeader(boolean refresh=false) {
   html += "</script>";
   html += "<br><div class='w3-container w3-large' style='margin-top:88px'>";
   return html;
-  // TODO: dorobit ajax script pre ovladanie serva https://circuits4you.com/2018/02/04/esp8266-ajax-update-part-of-web-page-without-refreshing/
 }
 
 String getFooter() { 
@@ -506,7 +506,7 @@ void controlServo(int angle) {
   delay(10);
   blinds.write(angle);
   // Wait for servo to actually move
-  delay(( angleOfMove * 5 )+ 100);
+  delay(( angleOfMove * 5 )+ 500);
   // Disable servo
   digitalWrite(servoEnablePIN, LOW);
 
@@ -547,8 +547,7 @@ void measureLight() {
     Serial.print("Light percent: ");
     Serial.println(lightPercent);
     Serial.print("Light analog reading : ");
-    Serial.print(lightReading);
-    Serial.println(" %");
+    Serial.println(lightReading);
     if (lightPercent > 100) {
       lightPercent = 100;
     }    
@@ -559,14 +558,14 @@ void measureLight() {
 }
 
 void handleButtons() {
-	if (digitalRead(buttonUp) == HIGH) {  // start count time of short press of button UP
+	if (digitalRead(buttonUp) == LOW) {  // start count time of short press of button UP
 		if (buttonActive == false) {
 			buttonActive = true;
 			buttonTimer = millis();
 		}
     	buttonUpActive = true;
 	}
-	if (digitalRead(buttonDown) == HIGH) { // start count time of short press of button DOWN
+	if (digitalRead(buttonDown) == LOW) { // start count time of short press of button DOWN
 		if (buttonActive == false) {
 			buttonActive = true;
 			buttonTimer = millis();
@@ -577,22 +576,28 @@ void handleButtons() {
 		longPressActive = true;
 		if ((buttonUpActive == true) && (buttonDownActive == true)) { //  Long press of both buttons
       // Auto rotate by best light
+      Serial.println("Long press both buttons");
 		} else if((buttonUpActive == true) && (buttonDownActive == false)) {  //  Long press of button UP
       controlServo(MAXANGLE);
+      Serial.println("Long press button UP");
 		} else {                                                              // Long press of button DOWN
       controlServo(MINANGLE);
+      Serial.println("Long press button DOWN");
 		}
 	}
-	if ((buttonActive == true) && (digitalRead(buttonUp) == LOW) && (digitalRead(buttonDown) == LOW)) {
+	if ((buttonActive == true) && (digitalRead(buttonUp) == HIGH) && (digitalRead(buttonDown) == HIGH)) {
 		if (longPressActive == true) {  // END of both long pressed buttons
 			longPressActive = false;
 		} else {
 			if ((buttonUpActive == true) && (buttonDownActive == true)) { // short press of both buttons
         controlServo(90);
+        Serial.println("Short press both buttons");
 			} else if ((buttonUpActive == true) && (buttonDownActive == false)) { // short press of button UP
-        controlServo(actualServoAngle + 5);
+        controlServo(actualServoAngle + 10);
+        Serial.println("Short press button UP");
 			} else {                                                            // short press of button DOWN
-        controlServo(actualServoAngle - 5);
+        controlServo(actualServoAngle - 10);
+        Serial.println("Short press button DOWN");
 			}
 		}
 		buttonActive = false;
@@ -616,8 +621,8 @@ void setup() {
 
   // Set PIN modes
   pinMode(servoEnablePIN, OUTPUT);
-  pinMode(buttonUp, INPUT);
-	pinMode(buttonDown, INPUT);
+  pinMode(buttonUp, INPUT_PULLUP);
+	pinMode(buttonDown, INPUT_PULLUP);
 
   // Initialize digital pin for LED (little blue light on the Wemos D1 Mini)
   pinMode(externalLight, OUTPUT);
@@ -682,6 +687,7 @@ void setup() {
     server.on("/updateconfig", handleUpdateConfig);
     server.on("/configure", handleConfigure);
     server.on("/restart", handleRestart);
+    server.on("/control", handleServoControl);
     server.onNotFound(redirectHome);
     serverUpdater.setup(&server, "/update", www_username, www_password);
     // Start the server
@@ -789,6 +795,20 @@ void loop() {
 
   // Measure the light intensity
   measureLight();
+
+  // Handle buttons
+  handleButtons();
+}
+
+void handleServoControl() {
+  if (!authentication()) {
+    return server.requestAuthentication();
+  }
+  String t_angle = server.arg("angle"); //Refer  
+  Serial.print("AJAX Servo control request: ");
+  Serial.println(t_angle);
+  controlServo(t_angle.toInt());
+  server.send(200, "text/plane", String(actualServoAngle)); //Send web page
 }
 
 void handleUpdateConfig() {
@@ -858,9 +878,11 @@ void displayDeviceStatus() {
   html += "Host Name: " + hostname + "<br>";
   html += "Uptime: " + getUptime() + "<br>";  
   html += "<hr> <h2>Blinds position: </h2> <br>";
-  html += "<input type='range' style='min-width: 50%;' min='" + String(MINANGLE) + "' max='" + String(MAXANGLE) + "' value='" + String(actualServoAngle) + "' class='slider' id='angleSlider'>";
-
-  // TODO: dorobit fancy home page info o gerete
+  html += "<input type='range' style='min-width: 50%;' min='" + String(MINANGLE) + "' max='" + String(MAXANGLE) + "' value='" + String(actualServoAngle) + "' class='slider' \ 
+  id='angleSlider' onChange='moveServo()'>";
+  html += "<script>function moveServo(){ var xhttp = new XMLHttpRequest();xhttp.onreadystatechange = function(){ \
+    if (this.readyState == 4 && this.status == 200){ document.getElementById('angleSlider').value = this.responseText; } }; \
+    xhttp.open('get', 'control?angle='+ document.getElementById('angleSlider').value); xhttp.send(); } </script>";
 
   html += "</p></div></div>";
 
