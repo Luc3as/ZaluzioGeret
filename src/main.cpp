@@ -487,7 +487,6 @@ void handleConfigure() {
 }
 
 void controlServo(int angle) {
-  int angleOfMove = abs(angle - actualServoAngle) ; 
   // check min angle
   if (angle < MINANGLE) {
     angle = MINANGLE;
@@ -496,12 +495,15 @@ void controlServo(int angle) {
   if (angle > MAXANGLE) {
     angle = MAXANGLE;
   }
+
+  int angleOfMove = abs(angle - actualServoAngle) ; 
+
+  actualServoAngle = angle ; 
+
   // calculate reversed direction angle if needed  
   if (IS_REVERSED_CONTROL ) {
     angle = ( 180 - angle ) ;
   }
-
-  actualServoAngle = angle ; 
 
   // Enable servo
   digitalWrite(servoEnablePIN, HIGH);
