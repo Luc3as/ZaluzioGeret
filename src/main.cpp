@@ -120,8 +120,6 @@ void handleRestart();
 void displayDeviceStatus();
 void lightFinder();
 
-// TODO: dorobit auto natocenie podla najlepsieho svetla
-
 
 void flashLED(int number, int delayTime) {
   for (int inx = 0; inx < number; inx++) {
