@@ -113,12 +113,12 @@ String COLOR_THEMES = "<option>red</option>"
 
 void writeSettings();
 void handleWifiReset();
+void handleServoControl();
 void handleUpdateConfig();
 void handleConfigure();
 void handleRestart();
 void displayDeviceStatus();
-
-// TODO: dorobit auto natocenie podla najlepsieho svetla
+void lightFinder();
 
 
 void flashLED(int number, int delayTime) {
@@ -229,6 +229,7 @@ void readSettings() {
   timeClient.setUtcOffset(UtcOffset);
   LWTTopic = MQTTPUBTOPIC + "/" + hostname + "/LWT";
   SUBTopic = MQTTSUBTOPIC + "/" + hostname + "/Rotate";
+  SUBTopicLight = MQTTSUBTOPIC + "/" + hostname + "/FindLight";
   PUBTopicLight = MQTTPUBTOPIC + "/" + hostname + "/Light";
   PUBTopicAngle = MQTTPUBTOPIC + "/" + hostname + "/Angle";
 
@@ -326,7 +327,6 @@ String getHeader(boolean refresh=false) {
   html += "</script>";
   html += "<br><div class='w3-container w3-large' style='margin-top:88px'>";
   return html;
-  // TODO: dorobit ajax script pre ovladanie serva https://circuits4you.com/2018/02/04/esp8266-ajax-update-part-of-web-page-without-refreshing/
 }
 
 String getFooter() { 
@@ -485,7 +485,6 @@ void handleConfigure() {
 }
 
 void controlServo(int angle) {
-  int angleOfMove = abs(angle - actualServoAngle) ; 
   // check min angle
   if (angle < MINANGLE) {
     angle = MINANGLE;
@@ -494,19 +493,22 @@ void controlServo(int angle) {
   if (angle > MAXANGLE) {
     angle = MAXANGLE;
   }
+
+  int angleOfMove = abs(angle - actualServoAngle) ; 
+
+  actualServoAngle = angle ; 
+
   // calculate reversed direction angle if needed  
   if (IS_REVERSED_CONTROL ) {
     angle = ( 180 - angle ) ;
   }
-
-  actualServoAngle = angle ; 
 
   // Enable servo
   digitalWrite(servoEnablePIN, HIGH);
   delay(10);
   blinds.write(angle);
   // Wait for servo to actually move
-  delay(( angleOfMove * 5 )+ 100);
+  delay(( angleOfMove * 10 )+ 200);
   // Disable servo
   digitalWrite(servoEnablePIN, LOW);
 
@@ -514,6 +516,38 @@ void controlServo(int angle) {
   String actualServoAngleStr = String(actualServoAngle);
   char *actualServoAngleChar = &actualServoAngleStr[0u];
   client.publish((const char*)PUBTopicAngle.c_str(),actualServoAngleChar, false);
+}
+
+void lightFinder(){
+  int bestLight = 0;
+  int bestAngle = 90;
+  float currentLight = 0;
+  float currentAngle ;
+  int a = MINANGLE;
+  Serial.println("Finding best light... ");
+  while( a < MAXANGLE ) {  
+    // Move servo
+    controlServo(a);
+    // Measure light
+    currentLight = analogRead(LDRPIN) ;
+    currentAngle = a;
+    if (currentLight > bestLight) { // If we have better light, mark angle
+      bestLight = currentLight;
+      bestAngle = a;
+    }
+    Serial.print("Angle: ");
+    Serial.print(a);
+    Serial.print(" Light: ");
+    Serial.println(currentLight);
+    a = a + 10 ;
+  }
+  Serial.print("Best light: ");
+  Serial.print(currentLight);
+  Serial.print(" at Angle: ");
+  Serial.println(a);  
+  
+  // Move blinds to best angle for light
+  controlServo(bestAngle);
 }
 
 void handleIncommingMessage(char* topic, byte* payload, unsigned int length) {
@@ -535,6 +569,16 @@ void handleIncommingMessage(char* topic, byte* payload, unsigned int length) {
             Serial.println("Angle should be between " + String(MINANGLE) + " and " + String(MAXANGLE) + " degrees.");
         }
     } 
+    if (!strcmp(topic, (const char*)SUBTopicLight.c_str())) {  // We  got command to find best light
+        char command[3];
+        for (int i = 0; i < length; i++) {
+            Serial.print((char)payload[i]);
+            command[i] = (char)payload[i];
+        }
+        Serial.println();
+        Serial.println("Got command for find light");
+        lightFinder();
+    } 
 }
 
 void measureLight() { 
@@ -547,8 +591,7 @@ void measureLight() {
     Serial.print("Light percent: ");
     Serial.println(lightPercent);
     Serial.print("Light analog reading : ");
-    Serial.print(lightReading);
-    Serial.println(" %");
+    Serial.println(lightReading);
     if (lightPercent > 100) {
       lightPercent = 100;
     }    
@@ -559,14 +602,14 @@ void measureLight() {
 }
 
 void handleButtons() {
-	if (digitalRead(buttonUp) == HIGH) {  // start count time of short press of button UP
+	if (digitalRead(buttonUp) == LOW) {  // start count time of short press of button UP
 		if (buttonActive == false) {
 			buttonActive = true;
 			buttonTimer = millis();
 		}
     	buttonUpActive = true;
 	}
-	if (digitalRead(buttonDown) == HIGH) { // start count time of short press of button DOWN
+	if (digitalRead(buttonDown) == LOW) { // start count time of short press of button DOWN
 		if (buttonActive == false) {
 			buttonActive = true;
 			buttonTimer = millis();
@@ -577,22 +620,29 @@ void handleButtons() {
 		longPressActive = true;
 		if ((buttonUpActive == true) && (buttonDownActive == true)) { //  Long press of both buttons
       // Auto rotate by best light
+      lightFinder();
+      Serial.println("Long press both buttons");
 		} else if((buttonUpActive == true) && (buttonDownActive == false)) {  //  Long press of button UP
       controlServo(MAXANGLE);
+      Serial.println("Long press button UP");
 		} else {                                                              // Long press of button DOWN
       controlServo(MINANGLE);
+      Serial.println("Long press button DOWN");
 		}
 	}
-	if ((buttonActive == true) && (digitalRead(buttonUp) == LOW) && (digitalRead(buttonDown) == LOW)) {
+	if ((buttonActive == true) && (digitalRead(buttonUp) == HIGH) && (digitalRead(buttonDown) == HIGH)) {
 		if (longPressActive == true) {  // END of both long pressed buttons
 			longPressActive = false;
 		} else {
 			if ((buttonUpActive == true) && (buttonDownActive == true)) { // short press of both buttons
         controlServo(90);
+        Serial.println("Short press both buttons");
 			} else if ((buttonUpActive == true) && (buttonDownActive == false)) { // short press of button UP
-        controlServo(actualServoAngle + 5);
+        controlServo(actualServoAngle + 10);
+        Serial.println("Short press button UP");
 			} else {                                                            // short press of button DOWN
-        controlServo(actualServoAngle - 5);
+        controlServo(actualServoAngle - 10);
+        Serial.println("Short press button DOWN");
 			}
 		}
 		buttonActive = false;
@@ -616,8 +666,8 @@ void setup() {
 
   // Set PIN modes
   pinMode(servoEnablePIN, OUTPUT);
-  pinMode(buttonUp, INPUT);
-	pinMode(buttonDown, INPUT);
+  pinMode(buttonUp, INPUT_PULLUP);
+	pinMode(buttonDown, INPUT_PULLUP);
 
   // Initialize digital pin for LED (little blue light on the Wemos D1 Mini)
   pinMode(externalLight, OUTPUT);
@@ -682,6 +732,7 @@ void setup() {
     server.on("/updateconfig", handleUpdateConfig);
     server.on("/configure", handleConfigure);
     server.on("/restart", handleRestart);
+    server.on("/control", handleServoControl);
     server.onNotFound(redirectHome);
     serverUpdater.setup(&server, "/update", www_username, www_password);
     // Start the server
@@ -725,6 +776,7 @@ void reconnectMQTT() {
           Serial.println("connected to MQTT");
           client.publish((const char*)LWTTopic.c_str(), online_msg, 1); // Send last will message
           client.subscribe((const char*)SUBTopic.c_str());
+          client.subscribe((const char*)SUBTopicLight.c_str());
         } else {
           Serial.print("failed, rc=");
           Serial.print(client.state());
@@ -789,6 +841,20 @@ void loop() {
 
   // Measure the light intensity
   measureLight();
+
+  // Handle buttons
+  handleButtons();
+}
+
+void handleServoControl() {
+  if (!authentication()) {
+    return server.requestAuthentication();
+  }
+  String t_angle = server.arg("angle"); //Refer  
+  Serial.print("AJAX Servo control request: ");
+  Serial.println(t_angle);
+  controlServo(t_angle.toInt());
+  server.send(200, "text/plane", String(actualServoAngle)); //Send web page
 }
 
 void handleUpdateConfig() {
@@ -858,9 +924,11 @@ void displayDeviceStatus() {
   html += "Host Name: " + hostname + "<br>";
   html += "Uptime: " + getUptime() + "<br>";  
   html += "<hr> <h2>Blinds position: </h2> <br>";
-  html += "<input type='range' style='min-width: 50%;' min='" + String(MINANGLE) + "' max='" + String(MAXANGLE) + "' value='" + String(actualServoAngle) + "' class='slider' id='angleSlider'>";
-
-  // TODO: dorobit fancy home page info o gerete
+  html += "<input type='range' style='min-width: 50%;' min='" + String(MINANGLE) + "' max='" + String(MAXANGLE) + "' value='" + String(actualServoAngle) + "' class='slider' \ 
+  id='angleSlider' onChange='moveServo()'>";
+  html += "<script>function moveServo(){ var xhttp = new XMLHttpRequest();xhttp.onreadystatechange = function(){ \
+    if (this.readyState == 4 && this.status == 200){ document.getElementById('angleSlider').value = this.responseText; } }; \
+    xhttp.open('get', 'control?angle='+ document.getElementById('angleSlider').value); xhttp.send(); } </script>";
 
   html += "</p></div></div>";
 

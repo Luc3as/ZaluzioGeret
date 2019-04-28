@@ -60,7 +60,7 @@ int actualServoAngle = 90;
 int buttonUp = D5;
 int buttonDown = D6;
 long buttonTimer = 0;   // For counting time the button is presed
-long longPressTime = 1000;  // How long is considered as long-press of button (miliseconds)
+long longPressTime = 750;  // How long is considered as long-press of button (miliseconds)
 boolean buttonActive = false;
 boolean longPressActive = false;
 boolean buttonUpActive = false;
@@ -85,6 +85,7 @@ const char* online_msg = "Online";
 int sendInterval = 5;
 String LWTTopic ;
 String SUBTopic ;
+String SUBTopicLight ;
 String PUBTopicLight ;
 String PUBTopicAngle ;
 
