@@ -25,7 +25,7 @@ There are 2 buttons connected, UP and DOWN, each short press control the servo w
 Long press of each button moves the servo to the MIN or MAX position defined. Long pressing of both buttons starts the LightFinder procedure. LightFinder procedure moves the servo to MIN position, and then continually measure light after each move. Then it move to the position in which highest light was measured. 
 
 ## Wiring scheme
-TO BE DONE
+![Wiring scheme](https://github.com/Luc3as/ZaluzioGeret/blob/master/PCB/PCB%20sketch_bb.png?raw=true)
 
 ## Physical installation
 Device is mounted to window frame by self adhesive tape by 3M.
