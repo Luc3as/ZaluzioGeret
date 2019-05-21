@@ -27,6 +27,15 @@ Long press of each button moves the servo to the MIN or MAX position defined. Lo
 LightFinder procedure moves the servo to MIN position, and then continually measure light after each move. Then it move to the position in which highest light was measured. 
 Long pressing of both buttons for 8 seconds resets the WiFi settings, putting the device into AP configuration mode. 
 
+## MQTT Commands
+```
+  MQTTPUBTOPIC/hostname/LWT - Where status of device is sent 
+  MQTTSUBTOPIC/hostname/Rotate  - Command for controlling angle of servo number expected
+  MQTTSUBTOPIC/hostname/FindLight - Command for start LightFinder procedure. On expected
+  MQTTPUBTOPIC/hostname/Light - Here is light measured sent
+  MQTTPUBTOPIC/hostname/Angle - Here is current angle of servo sent
+```
+
 ## Wiring scheme
 ![Wiring scheme](https://github.com/Luc3as/ZaluzioGeret/blob/master/PCB/PCB%20sketch_bb.png?raw=true)
 
