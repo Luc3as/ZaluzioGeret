@@ -27,7 +27,7 @@ SOFTWARE.
 
 #include "Settings.h"
 
-#define VERSION "1.1"
+#define VERSION "1.2"
 
 #define CONFIG "/conf.txt"
 
@@ -542,9 +542,9 @@ void lightFinder(){
     a = a + 10 ;
   }
   Serial.print("Best light: ");
-  Serial.print(currentLight);
+  Serial.print(bestLight);
   Serial.print(" at Angle: ");
-  Serial.println(a);  
+  Serial.println(bestAngle);  
   
   // Move blinds to best angle for light
   controlServo(bestAngle);
@@ -616,31 +616,33 @@ void handleButtons() {
 		}
 		buttonDownActive = true;
 	}
-	if ((buttonActive == true) && (millis() - buttonTimer > longPressTime) && (longPressActive == false)) {
-		longPressActive = true;
-		if ((buttonUpActive == true) && (buttonDownActive == true)) { //  Long press of both buttons
-      // Auto rotate by best light
-      lightFinder();
-      Serial.println("Long press both buttons");
-		} else if((buttonUpActive == true) && (buttonDownActive == false)) {  //  Long press of button UP
-      controlServo(MAXANGLE);
-      Serial.println("Long press button UP");
-		} else {                                                              // Long press of button DOWN
-      controlServo(MINANGLE);
-      Serial.println("Long press button DOWN");
-		}
-	}
-  if ((buttonActive == true) && (millis() - buttonTimer > megaLongPressTime) && (longPressActive == true)) {
-		longPressActive = true;
-		if ((buttonUpActive == true) && (buttonDownActive == true)) { //  Long press of both buttons
-      // Auto rotate by best light
-      handleWifiReset();
-      Serial.println("Mega long press both buttons, forgetting wifi.");
-		}
-	}
+
 	if ((buttonActive == true) && (digitalRead(buttonUp) == HIGH) && (digitalRead(buttonDown) == HIGH)) {
-		if (longPressActive == true) {  // END of both long pressed buttons
+
+    if ( (millis() - buttonTimer > longPressTime) && (millis() - buttonTimer < megaLongPressTime) && (longPressActive == false)) {
+      longPressActive = true;
+      if ((buttonUpActive == true) && (buttonDownActive == true)) { //  Long press of both buttons
+        // Auto rotate by best light
+        lightFinder();
+        Serial.println("Long press both buttons");
+      } else if((buttonUpActive == true) && (buttonDownActive == false)) {  //  Long press of button UP
+        controlServo(MAXANGLE);
+        Serial.println("Long press button UP");
+      } else {                                                              // Long press of button DOWN
+        controlServo(MINANGLE);
+        Serial.println("Long press button DOWN");
+      }
+    } else if ((buttonUpActive == true) && (buttonDownActive == true) && (millis() - buttonTimer > megaLongPressTime) && (megaLongPressActive == false) ) {
+      megaLongPressActive = true;
+      Serial.println("Mega long press both buttons, forgetting wifi.");
+        WiFiManager wifiManager;
+        wifiManager.resetSettings();
+        ESP.restart();
+    }
+
+    if (longPressActive == true || megaLongPressActive == true ) {  // END of both long pressed buttons
 			longPressActive = false;
+      megaLongPressActive = false;
 		} else {
 			if ((buttonUpActive == true) && (buttonDownActive == true)) { // short press of both buttons
         controlServo(90);

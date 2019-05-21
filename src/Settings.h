@@ -61,9 +61,10 @@ int buttonUp = D5;
 int buttonDown = D6;
 long buttonTimer = 0;   // For counting time the button is presed
 long longPressTime = 750;  // How long is considered as long-press of button (miliseconds)
-long megaLongPressTime = 8000;  // How long is considered as long-press of button (miliseconds)
+long megaLongPressTime = 8 * 1000;  // How long is considered as long-press of button (miliseconds)
 boolean buttonActive = false;
 boolean longPressActive = false;
+boolean megaLongPressActive = false;
 boolean buttonUpActive = false;
 boolean buttonDownActive = false;
 
@@ -99,7 +100,7 @@ boolean DISPLAYCLOCK = true;   // true = Show Clock when not printing / false = 
 long now ;
 
 // LED Settings
-const int externalLight = LED_BUILTIN; // Set to unused pin, like D1, to disable use of built-in LED (LED_BUILTIN)
+const int externalLight = D1; // Set to unused pin, like D1, to disable use of built-in LED (LED_BUILTIN)
 
 // OTA Updates
 boolean ENABLE_OTA = true;     // this will allow you to load firmware to the device over WiFi (see OTA for ESP8266)
