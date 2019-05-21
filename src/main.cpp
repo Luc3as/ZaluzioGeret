@@ -630,6 +630,14 @@ void handleButtons() {
       Serial.println("Long press button DOWN");
 		}
 	}
+  if ((buttonActive == true) && (millis() - buttonTimer > megaLongPressTime) && (longPressActive == true)) {
+		longPressActive = true;
+		if ((buttonUpActive == true) && (buttonDownActive == true)) { //  Long press of both buttons
+      // Auto rotate by best light
+      handleWifiReset();
+      Serial.println("Mega long press both buttons, forgetting wifi.");
+		}
+	}
 	if ((buttonActive == true) && (digitalRead(buttonUp) == HIGH) && (digitalRead(buttonDown) == HIGH)) {
 		if (longPressActive == true) {  // END of both long pressed buttons
 			longPressActive = false;

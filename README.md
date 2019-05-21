@@ -16,13 +16,16 @@ You can redefine some default settings through Settings.h file. It is pretty sel
 
 ## Usage
 There is WiFi Manager on board so after burning the firmware, device is in AP mode, default password for connecting to AP is: configure.
+Default account for configuring / controlling the device is admin with password: password
 
 After connecting to WiFi, there is UI configuration interface, you can find device IP address through serial terminal or through in your router, or through scanning the network. Device hostname is ZaluzioGeret-MAC_END.
 
 There are settings for specifiing MIN and MAX angle of rotation, and reverse direction of inner logic.
 
 There are 2 buttons connected, UP and DOWN, each short press control the servo with 5° in respective direction. Short pressing of both buttons resets the servo in middle position. 
-Long press of each button moves the servo to the MIN or MAX position defined. Long pressing of both buttons starts the LightFinder procedure. LightFinder procedure moves the servo to MIN position, and then continually measure light after each move. Then it move to the position in which highest light was measured. 
+Long press of each button moves the servo to the MIN or MAX position defined. Long pressing of both buttons starts the LightFinder procedure. 
+LightFinder procedure moves the servo to MIN position, and then continually measure light after each move. Then it move to the position in which highest light was measured. 
+Long pressing of both buttons for 8 seconds resets the WiFi settings, putting the device into AP configuration mode. 
 
 ## Wiring scheme
 ![Wiring scheme](https://github.com/Luc3as/ZaluzioGeret/blob/master/PCB/PCB%20sketch_bb.png?raw=true)

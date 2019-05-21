@@ -61,6 +61,7 @@ int buttonUp = D5;
 int buttonDown = D6;
 long buttonTimer = 0;   // For counting time the button is presed
 long longPressTime = 750;  // How long is considered as long-press of button (miliseconds)
+long megaLongPressTime = 8000;  // How long is considered as long-press of button (miliseconds)
 boolean buttonActive = false;
 boolean longPressActive = false;
 boolean buttonUpActive = false;
