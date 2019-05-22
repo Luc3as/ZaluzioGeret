@@ -80,6 +80,7 @@ String MQTTPASS ;
 int MQTTPORT;
 String MQTTSUBTOPIC ;
 String MQTTPUBTOPIC ;
+String MQTTSLAVEID ;
 const char* on_cmd = "ON";
 const char* off_cmd = "OFF";
 const char* will_msg = "Offline";
@@ -90,11 +91,12 @@ String SUBTopic ;
 String SUBTopicLight ;
 String PUBTopicLight ;
 String PUBTopicAngle ;
+String SlaveTopic;
 
 // Date and Time
 float UtcOffset = +2; // Hour offset from GMT for your timezone
 boolean IS_REVERSED_CONTROL = false;  
-const char* ntp_server = "ntp.lukasporubcan.sk";
+const char* ntp_server = "eu.pool.ntp.org";
 int minutesBetweenDataRefresh = 15;
 boolean DISPLAYCLOCK = true;   // true = Show Clock when not printing / false = turn off display when not printing
 long now ;

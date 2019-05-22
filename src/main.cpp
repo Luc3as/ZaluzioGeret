@@ -74,7 +74,8 @@ String CHANGE_FORM =  "<form class='w3-container' action='/updateconfig' method=
                       "<p><label>MQTT Server User</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttUser' value='%MQTTUSER%' maxlength='30'></p>"
                       "<p><label>MQTT Server Password </label><input class='w3-input w3-border w3-margin-bottom' type='password' name='mqttPass' value='%MQTTPASS%'></p><hr>"
                       "<p><label>MQTT subscribe topic prefix ( prefix/hostname/topic )</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttSubTopic' value='%MQTTSUBTOPIC%' maxlength='30'></p>"
-                      "<p><label>MQTT publish topic prefix ( prefix/hostname/topic )</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttPubTopic' value='%MQTTPUBTOPIC%' maxlength='30'></p><hr>"
+                      "<p><label>MQTT publish topic prefix ( prefix/hostname/topic )</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttPubTopic' value='%MQTTPUBTOPIC%' maxlength='30'></p>"
+                      "<p><label>MQTT slave ID </label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttSlaveId' value='%MQTTSLAVEID%' maxlength='30'></p><hr>"
                       "<p><input name='isreversedcontrol' class='w3-check w3-margin-top' type='checkbox' %IS_REVERSED_CONTROL%> Reverse direction of servo</p><hr>"
                       "<p><label>Minimal servo angle</label><input class='w3-input w3-border w3-margin-bottom' type='number' name='minAngle' value='%MINANGLE%' min'0' max'180'></p>"
                       "<p><label>Maximal servo angle</label><input class='w3-input w3-border w3-margin-bottom' type='number' name='maxAngle' value='%MAXANGLE%' min'0' max'180'></p>"
@@ -210,6 +211,11 @@ void readSettings() {
       MQTTPUBTOPIC.trim();
       Serial.println("MQTTPUBTOPIC=" + String(MQTTPUBTOPIC));
     }
+    if (line.indexOf("MQTTSLAVEID=") >= 0) {
+      MQTTSLAVEID = line.substring(line.lastIndexOf("MQTTSLAVEID=") + 12);
+      MQTTSLAVEID.trim();
+      Serial.println("MQTTSLAVEID=" + String(MQTTSLAVEID));
+    }
     if (line.indexOf("MINANGLE=") >= 0) {
       MINANGLE = line.substring(line.lastIndexOf("MINANGLE=") + 9).toInt();
       Serial.println("MINANGLE=" + String(MINANGLE));
@@ -230,6 +236,7 @@ void readSettings() {
   SUBTopicLight = MQTTSUBTOPIC + "/" + hostname + "/FindLight";
   PUBTopicLight = MQTTPUBTOPIC + "/" + hostname + "/Light";
   PUBTopicAngle = MQTTPUBTOPIC + "/" + hostname + "/Angle";
+  SlaveTopic = MQTTSUBTOPIC + "/" + MQTTSLAVEID + "/Rotate";
 
 }
 
@@ -254,6 +261,7 @@ void writeSettings() {
     f.println("MQTTPASS=" + String(MQTTPASS));
     f.println("MQTTSUBTOPIC=" + String(MQTTSUBTOPIC));
     f.println("MQTTPUBTOPIC=" + String(MQTTPUBTOPIC));
+    f.println("MQTTSLAVEID=" + String(MQTTSLAVEID));
     f.println("MINANGLE=" + String(MINANGLE));
     f.println("MAXANGLE=" + String(MAXANGLE));
     f.println("MAXLIGHT=" + String(MAXLIGHT));
@@ -429,6 +437,7 @@ void handleConfigure() {
   form.replace("%MQTTPASS%", MQTTPASS);
   form.replace("%MQTTSUBTOPIC%", MQTTSUBTOPIC);
   form.replace("%MQTTPUBTOPIC%", MQTTPUBTOPIC);
+  form.replace("%MQTTSLAVEID%", MQTTSLAVEID);
   form.replace("%MINANGLE%", String(MINANGLE));
   form.replace("%MAXANGLE%", String(MAXANGLE));
   form.replace("%MAXLIGHT%", String(MAXLIGHT));
@@ -592,6 +601,15 @@ void measureLight() {
   }
 }
 
+void handleSlaveDevice() {
+  if (MQTTSLAVEID != "" ) {
+    String actualServoAngleStr = String(actualServoAngle);
+    char *actualServoAngleChar = &actualServoAngleStr[0u];
+    client.publish((const char*)SlaveTopic.c_str(),actualServoAngleChar, false);
+    Serial.println("Sending command to slave device: " + MQTTSLAVEID);
+  }
+}
+
 void handleButtons() {
 	if (digitalRead(buttonUp) == LOW) {  // start count time of short press of button UP
 		if (buttonActive == false) {
@@ -608,7 +626,6 @@ void handleButtons() {
 		buttonDownActive = true;
 	}
 
-// TODO: send command to slave device if defined after button press
 	if ((buttonActive == true) && (digitalRead(buttonUp) == HIGH) && (digitalRead(buttonDown) == HIGH)) {
 
     if ( (millis() - buttonTimer > longPressTime) && (millis() - buttonTimer < megaLongPressTime) && (longPressActive == false)) {
@@ -619,9 +636,11 @@ void handleButtons() {
         Serial.println("Long press both buttons");
       } else if((buttonUpActive == true) && (buttonDownActive == false)) {  //  Long press of button UP
         controlServo(MAXANGLE);
+        handleSlaveDevice();
         Serial.println("Long press button UP");
       } else {                                                              // Long press of button DOWN
         controlServo(MINANGLE);
+        handleSlaveDevice();
         Serial.println("Long press button DOWN");
       }
     } else if ((buttonUpActive == true) && (buttonDownActive == true) && (millis() - buttonTimer > megaLongPressTime) && (megaLongPressActive == false) ) {
@@ -638,12 +657,15 @@ void handleButtons() {
 		} else {
 			if ((buttonUpActive == true) && (buttonDownActive == true)) { // short press of both buttons
         controlServo(90);
+        handleSlaveDevice();
         Serial.println("Short press both buttons");
 			} else if ((buttonUpActive == true) && (buttonDownActive == false)) { // short press of button UP
         controlServo(actualServoAngle + 10);
+        handleSlaveDevice();
         Serial.println("Short press button UP");
 			} else {                                                            // short press of button DOWN
         controlServo(actualServoAngle - 10);
+        handleSlaveDevice();
         Serial.println("Short press button DOWN");
 			}
 		}
@@ -880,6 +902,7 @@ void handleUpdateConfig() {
   MQTTPASS = server.arg("mqttPass");
   MQTTSUBTOPIC = server.arg("mqttSubTopic");
   MQTTPUBTOPIC = server.arg("mqttPubTopic");
+  MQTTSLAVEID = server.arg("mqttSlaveId");
   DISPLAYCLOCK = server.hasArg("isClockEnabled");
   IS_REVERSED_CONTROL = server.hasArg("isreversedcontrol");
   minutesBetweenDataRefresh = server.arg("refresh").toInt();
