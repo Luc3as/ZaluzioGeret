@@ -36,6 +36,8 @@ Long pressing of both buttons for 8 seconds resets the WiFi settings, putting th
   MQTTPUBTOPIC/hostname/Angle - Here is current angle of servo sent
 ```
 
+## TODO API call for rest command
+
 ## Wiring scheme
 ![Wiring scheme](https://github.com/Luc3as/ZaluzioGeret/blob/master/PCB/PCB%20sketch_bb.png?raw=true)
 

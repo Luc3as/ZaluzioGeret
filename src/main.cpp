@@ -114,6 +114,7 @@ String COLOR_THEMES = "<option>red</option>"
 void writeSettings();
 void handleWifiReset();
 void handleServoControl();
+void handleLightControl();
 void handleUpdateConfig();
 void handleConfigure();
 void handleRestart();
@@ -617,6 +618,7 @@ void handleButtons() {
 		buttonDownActive = true;
 	}
 
+// TODO: send command to slave device if defined after button press
 	if ((buttonActive == true) && (digitalRead(buttonUp) == HIGH) && (digitalRead(buttonDown) == HIGH)) {
 
     if ( (millis() - buttonTimer > longPressTime) && (millis() - buttonTimer < megaLongPressTime) && (longPressActive == false)) {
@@ -742,7 +744,8 @@ void setup() {
     server.on("/updateconfig", handleUpdateConfig);
     server.on("/configure", handleConfigure);
     server.on("/restart", handleRestart);
-    server.on("/control", handleServoControl);
+    server.on("/servocontrol", handleServoControl);
+    server.on("/lightcontrol", handleLightControl);
     server.onNotFound(redirectHome);
     serverUpdater.setup(&server, "/update", www_username, www_password);
     // Start the server
@@ -867,6 +870,15 @@ void handleServoControl() {
   server.send(200, "text/plane", String(actualServoAngle)); //Send web page
 }
 
+void handleLightControl() {
+  if (!authentication()) {
+    return server.requestAuthentication();
+  }
+  Serial.println("AJAX LightFinder control request: START");
+  server.send(200, "text/plane", "Finding light..."); //Send web page
+  lightFinder();
+}
+
 void handleUpdateConfig() {
   if (!authentication()) {
     return server.requestAuthentication();
@@ -935,10 +947,15 @@ void displayDeviceStatus() {
   html += "Uptime: " + getUptime() + "<br>";  
   html += "<hr> <h2>Blinds position: </h2> <br>";
   html += "<input type='range' style='min-width: 50%;' min='" + String(MINANGLE) + "' max='" + String(MAXANGLE) + "' value='" + String(actualServoAngle) + "' class='slider' \ 
-  id='angleSlider' onChange='moveServo()'>";
+  id='angleSlider' onChange='moveServo()'>  <br>";
   html += "<script>function moveServo(){ var xhttp = new XMLHttpRequest();xhttp.onreadystatechange = function(){ \
     if (this.readyState == 4 && this.status == 200){ document.getElementById('angleSlider').value = this.responseText; } }; \
-    xhttp.open('get', 'control?angle='+ document.getElementById('angleSlider').value); xhttp.send(); } </script>";
+    xhttp.open('get', 'servocontrol?angle='+ document.getElementById('angleSlider').value); xhttp.send(); } </script>";
+  html += "<button class='w3-button w3-yellow w3-section w3-padding' style='min-width: 50%;' type='button' \
+  id='LightFinder' onClick='findLight()'> LightFinder </button> <br>";
+  html += "<script>function findLight(){ var xhttp = new XMLHttpRequest();xhttp.onreadystatechange = function(){ \
+    if (this.readyState == 4 && this.status == 200){ document.getElementById('LightFinder').innerHTML = this.responseText; } }; \
+    xhttp.open('get', 'lightcontrol?'); xhttp.send(); } </script>";
 
   html += "</p></div></div>";
 
