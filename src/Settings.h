@@ -27,13 +27,13 @@ SOFTWARE.
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
 #include <ESP8266HTTPUpdateServer.h>
-#include "TimeClient.h"
 #include "FS.h"
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 #include <PubSubClient.h>
 #include <Servo.h>
 #include <Wire.h>
-
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
 // Constants and initializations
 String themeColor = "light-green"; // this can be changed later in the web interface.
@@ -93,8 +93,8 @@ String PUBTopicAngle ;
 
 // Date and Time
 float UtcOffset = +2; // Hour offset from GMT for your timezone
-boolean IS_REVERSED_CONTROL = false;    
-boolean IS_24HOUR = true;     // 23:00 millitary 24 hour clock
+boolean IS_REVERSED_CONTROL = false;  
+const char* ntp_server = "ntp.lukasporubcan.sk";
 int minutesBetweenDataRefresh = 15;
 boolean DISPLAYCLOCK = true;   // true = Show Clock when not printing / false = turn off display when not printing
 long now ;

@@ -27,7 +27,7 @@ SOFTWARE.
 
 #include "Settings.h"
 
-#define VERSION "1.2"
+#define VERSION "1.3"
 
 #define CONFIG "/conf.txt"
 
@@ -42,8 +42,10 @@ SOFTWARE.
 
 String hostname = "ZaluzioGeret-" + String(ESP.getChipId(), HEX);
 
+WiFiUDP ntpUDP;
 // Time 
-TimeClient timeClient(UtcOffset);
+NTPClient timeClient(ntpUDP, ntp_server , UtcOffset * 3600, 120000);
+
 long lastEpoch = 0;
 long firstEpoch = 0;
 long displayOffEpoch = 0;
@@ -79,7 +81,6 @@ String CHANGE_FORM =  "<form class='w3-container' action='/updateconfig' method=
                       "<p><label>Maximal light intensity ( 0 - 1023 )</label><input class='w3-input w3-border w3-margin-bottom' type='number' name='maxLight' value='%MAXLIGHT%' min'0' max'1023'></p>";
                       
 String THEME_FORM =   "<p>Theme Color <select class='w3-option w3-padding' name='theme'>%THEME_OPTIONS%</select></p>"
-                      "<p><input name='is24hour' class='w3-check w3-margin-top' type='checkbox' %IS_24HOUR_CHECKED%> Use 24 Hour Clock (military time)</p>"
                       "<p>Clock Sync (minutes) <select class='w3-option w3-padding' name='refresh'>%OPTIONS%</select></p>"
                       "<p><label>UTC Time Offset</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='utcoffset' value='%UTCOFFSET%' maxlength='12'></p><hr>"
                       "<p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
@@ -176,10 +177,6 @@ void readSettings() {
       DISPLAYCLOCK = line.substring(line.lastIndexOf("DISPLAYCLOCK=") + 13).toInt();
       Serial.println("DISPLAYCLOCK=" + String(DISPLAYCLOCK));
     }
-    if (line.indexOf("is24hour=") >= 0) {
-      IS_24HOUR = line.substring(line.lastIndexOf("is24hour=") + 9).toInt();
-      Serial.println("IS_24HOUR=" + String(IS_24HOUR));
-    }
     if (line.indexOf("IS_REVERSED_CONTROL=") >= 0) {
       IS_REVERSED_CONTROL = line.substring(line.lastIndexOf("IS_REVERSED_CONTROL=") + 20).toInt();
       Serial.println("IS_REVERSED_CONTROL=" + String(IS_REVERSED_CONTROL));
@@ -227,7 +224,7 @@ void readSettings() {
     }         
   }
   fr.close();
-  timeClient.setUtcOffset(UtcOffset);
+  timeClient.setTimeOffset(UtcOffset * 3600);
   LWTTopic = MQTTPUBTOPIC + "/" + hostname + "/LWT";
   SUBTopic = MQTTSUBTOPIC + "/" + hostname + "/Rotate";
   SUBTopicLight = MQTTSUBTOPIC + "/" + hostname + "/FindLight";
@@ -250,7 +247,6 @@ void writeSettings() {
     f.println("www_username=" + String(www_username));
     f.println("www_password=" + String(www_password));
     f.println("DISPLAYCLOCK=" + String(DISPLAYCLOCK));
-    f.println("is24hour=" + String(IS_24HOUR));
     f.println("IS_REVERSED_CONTROL=" + String(IS_REVERSED_CONTROL));
     f.println("MQTTADDRESS=" + String(MQTTADDRESS));
     f.println("MQTTPORT=" + String(MQTTPORT));
@@ -264,7 +260,7 @@ void writeSettings() {
   }
   f.close();
   readSettings();
-  timeClient.setUtcOffset(UtcOffset);
+  timeClient.setTimeOffset(UtcOffset * 3600);
 }
 
 void findMDNS() {
@@ -465,12 +461,6 @@ void handleConfigure() {
   form.replace("%IS_BASICAUTH_CHECKED%", isUseSecurityChecked);
   form.replace("%USERID%", String(www_username));
   form.replace("%STATIONPASSWORD%", String(www_password));
-  
-  String is24hourChecked = "";
-  if (IS_24HOUR) {
-    is24hourChecked = "checked='checked'";
-  }
-  form.replace("%IS_24HOUR_CHECKED%", is24hourChecked);
   
   String options = "<option>10</option><option>15</option><option>20</option><option>30</option><option>60</option>";
   options.replace(">"+String(minutesBetweenDataRefresh)+"<", " selected>"+String(minutesBetweenDataRefresh)+"<");
@@ -807,7 +797,7 @@ void reconnectMQTT() {
 }
 
 int getMinutesFromLastRefresh() {
-  int minutes = (timeClient.getCurrentEpoch() - lastEpoch) / 60;
+  int minutes = (timeClient.getEpochTime() - lastEpoch) / 60;
   return minutes;
 }
 
@@ -818,9 +808,9 @@ void getUpdateTime() {
 
   Serial.println("Updating Time...");
   //Update the Time
-  timeClient.updateTime();
-  lastEpoch = timeClient.getCurrentEpoch();
-  Serial.println("Local time: " + timeClient.getAmPmFormattedTime());
+  timeClient.update();
+  lastEpoch = timeClient.getEpochTime();
+  Serial.println("Local time: " + timeClient.getFormattedTime());
 
   digitalWrite(externalLight, HIGH);  // turn off the LED
 }
@@ -891,7 +881,6 @@ void handleUpdateConfig() {
   MQTTSUBTOPIC = server.arg("mqttSubTopic");
   MQTTPUBTOPIC = server.arg("mqttPubTopic");
   DISPLAYCLOCK = server.hasArg("isClockEnabled");
-  IS_24HOUR = server.hasArg("is24hour");
   IS_REVERSED_CONTROL = server.hasArg("isreversedcontrol");
   minutesBetweenDataRefresh = server.arg("refresh").toInt();
   themeColor = server.arg("theme");
@@ -936,10 +925,7 @@ void displayDeviceStatus() {
   server.send(200, "text/html", "");
   server.sendContent(String(getHeader(true)));
 
-  String displayTime = timeClient.getAmPmHours() + ":" + timeClient.getMinutes() + ":" + timeClient.getSeconds() + " " + timeClient.getAmPm();
-  if (IS_24HOUR) {
-    displayTime = timeClient.getHours() + ":" + timeClient.getMinutes() + ":" + timeClient.getSeconds();
-  }
+  String displayTime = timeClient.getFormattedTime() ;
   
   html += "<div class='w3-cell-row' style='width:100%'><h2>Time: " + displayTime + "</h2></div><div class='w3-cell-row'>";
   html += "<div class='w3-cell w3-container' style='width:100%'><p>";
