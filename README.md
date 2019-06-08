@@ -65,7 +65,7 @@ Device is mounted to window frame by self adhesive tape by 3M.
 
 For cable routing I used sticky cable trunking with name MONTERA. 
 
-All 3D source files will be uploaded to thingiverse.com
+All parts for 3D printing are on [thingiverse project page](https://www.thingiverse.com/thing:3679293)
 
 ![](https://i.ibb.co/72Cv8DY/servo-verzia-lava1.png)
 ![](https://i.ibb.co/3ztyH5z/servo-verzia-lava.png)
