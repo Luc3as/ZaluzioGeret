@@ -57,6 +57,51 @@ You have to be authenticated or send basic auth with request.
 ``` 
 ip.of.dev.ice/servocontrol?angle=XX
 ```
+
+## Example Home Assisant configuration
+```yaml
+cover:
+  - platform: mqtt
+    name: "Žalúzie spálňa lavé"
+    device_class: "blind"
+    availability_topic: "stat/ZaluzioGeret-3252d1/LWT"
+    qos: 0
+    retain: false
+    payload_available: "Online"
+    payload_not_available: "Offline"
+    optimistic: false
+    value_template: '{{ value.x }}'
+    tilt_command_topic: 'cmnd/ZaluzioGeret-3252d1/Rotate'
+    tilt_status_topic: 'stat/ZaluzioGeret-3252d1/Angle'
+    tilt_min: 0
+    tilt_max: 180
+    tilt_closed_value: 180
+    tilt_opened_value: 90
+    
+  - platform: mqtt
+    name: "Žalúzie spálňa pravé"
+    device_class: "blind"
+    availability_topic: "stat/ZaluzioGeret-5d26b9/LWT"
+    qos: 0
+    retain: false
+    payload_available: "Online"
+    payload_not_available: "Offline"
+    optimistic: false
+    value_template: '{{ value.x }}'
+    tilt_command_topic: 'cmnd/ZaluzioGeret-5d26b9/Rotate'
+    tilt_status_topic: 'stat/ZaluzioGeret-5d26b9/Angle'
+    tilt_min: 0
+    tilt_max: 180
+    tilt_closed_value: 180
+    tilt_opened_value: 90
+
+  - platform: group
+    name: "Žalúzie spálňa"
+    entities:
+      - cover.zaluzie_spalna_lave
+      - cover.zaluzie_spalna_prave
+```
+
 ## Wiring scheme
 ![Wiring scheme](https://github.com/Luc3as/ZaluzioGeret/blob/master/PCB/PCB%20sketch_bb.png?raw=true)
 
