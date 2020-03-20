@@ -117,3 +117,12 @@ All parts for 3D printing are on [thingiverse project page](https://www.thingive
 ![](https://i.ibb.co/2h6PdQr/IMG-20190520-203901.jpg)
 ![](https://i.ibb.co/PDZDb6D/IMG-20190520-203852.jpg)
 ![](https://i.ibb.co/RzhmBQ9/IMG-20190520-194750.jpg)
+
+### If You liked my work, You can buy me a coffee :)
+
+<a class="" target="_blank" href="https://www.buymeacoffee.com/luc3as"><img src="https://lukasporubcan.sk/images/buymeacoffee.png" alt="Buy Me A Coffee" style="max-width: 217px !important;"></a>
+
+### Or send some crypto
+
+<a class="" target="_blank" href="https://lukasporubcan.sk/donate"><img src="https://lukasporubcan.sk/images/donatebitcoin.png" alt="Donate Bitcoin" style="max-width: 217px !important;"></a>	
+			
